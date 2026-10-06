@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<!-- 只做 Android，产物就是可以直接发给别人安装的 APK -->
+		<TargetFramework>net10.0-android</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>LgtLxlVocab</RootNamespace>
+		<UseMaui>true</UseMaui>
+		<SingleProject>true</SingleProject>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<MauiXamlInflator>SourceGen</MauiXamlInflator>
+		<!-- 源码是 UTF-8，显式告诉编译器，避免按系统 ANSI 代码页误读中文 -->
+		<CodePage>65001</CodePage>
+
+		<!-- 应用信息 -->
+		<ApplicationTitle>LGT-LXL</ApplicationTitle>
+		<ApplicationId>com.lgtlxl.vocab</ApplicationId>
+		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+		<ApplicationVersion>1</ApplicationVersion>
+
+		<!-- Android 7.0 及以上 -->
+		<SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+		<AndroidPackageFormat>apk</AndroidPackageFormat>
+		<AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
+		<!-- 不裁剪也不 AOT：体积换稳定性，反射/JSON 在任何机型上都不会被裁掉 -->
+		<RunAOTCompilation>false</RunAOTCompilation>
+		<!-- 不做程序集裁剪：保证 JSON 序列化等反射功能在任何手机上都不会出问题 -->
+		<AndroidLinkMode>None</AndroidLinkMode>
+		<PublishTrimmed>false</PublishTrimmed>
+
+		<!-- 仓库内自带签名文件，重新打包的 APK 可以覆盖安装 -->
+		<AndroidKeyStore>true</AndroidKeyStore>
+		<AndroidSigningKeyStore>LgtLxl.keystore</AndroidSigningKeyStore>
+		<AndroidSigningKeyAlias>lgtlxl</AndroidSigningKeyAlias>
+		<AndroidSigningKeyPass>lgt520lxl</AndroidSigningKeyPass>
+		<AndroidSigningStorePass>lgt520lxl</AndroidSigningStorePass>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- 应用图标与启动图 -->
+		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#5B4BE0" />
+		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#0E1020" BaseSize="128,128" />
+
+		<MauiImage Include="Resources\Images\*" />
+		<MauiFont Include="Resources\Fonts\*" />
+
+		<!-- 内置六级词库（离线可用） -->
+		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+	</ItemGroup>
+
+</Project>

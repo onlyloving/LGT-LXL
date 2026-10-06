@@ -1,0 +1,24 @@
+## .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.binlog
+*.log
+
+## MAUI / Android
+*.apk
+*.aab
+*.apks
+*.idsig
+*.keystore.bak
+
+## misc
+.DS_Store
+Thumbs.db
+*.tmp
