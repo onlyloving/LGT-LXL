@@ -77,7 +77,14 @@ public class UnlockPage : ContentPage
         if (_started)
             return;
         _started = true;
-        await AppState.LoadAsync();
+        try
+        {
+            await AppState.LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            CrashReporter.Record(ex, "UnlockPage.OnAppearing");
+        }
         _remember.IsChecked = Preferences.Default.Get("remember", false);
         if (_remember.IsChecked)
             await Navigation.PushAsync(new UserSelectPage());
@@ -191,11 +198,18 @@ public class HomePage : ContentPage
             },
             Ui.Lbl(goalText, 13, Ui.Dim))));
 
-        _root.Children.Add(BigButton("📖  开始背单词", $"已学 {p.LearnedCount} / {AppState.LibraryTotal} 词，点这里学新词或复习", Ui.Accent,
+        _root.Children.Add(BigButton("📖  背单词（学新词）", $"已学 {p.LearnedCount} / {AppState.LibraryTotal} 词 · 每个词要过「英译中 + 中译英」两关才算背过", Ui.Accent,
             () => _ = Navigation.PushAsync(new StudyPage())));
+        var due = AppState.DueCount(p);
+        _root.Children.Add(BigButton("🔁  复习", due > 0
+                ? $"今日有 {due} 个词到期该复习了（按 1/2/4/7/15/30 天安排）"
+                : $"暂时没有到期词 · 已学 {p.LearnedCount} 词可以随机复习", Ui.Warn,
+            () => _ = Navigation.PushAsync(new StudyPage(true))));
+        _root.Children.Add(BigButton("🔄  同步进度（两台手机）", "连同一个 Wi-Fi，点一下就能把对方的学习进度同步过来", Color.FromArgb("#3DD6C0"),
+            () => _ = Navigation.PushAsync(new SyncPage())));
         _root.Children.Add(BigButton("⚔️  单词对战", "从两人已学单词中抽 50 或 100 词，一分钟分高下", Ui.Accent2,
             () => _ = Navigation.PushAsync(new BattleSetupPage())));
-        _root.Children.Add(BigButton("📊  学习进度", "查看两人的进度对比和已学单词", Color.FromArgb("#3DD6C0"),
+        _root.Children.Add(BigButton("📊  学习进度", "查看两人的进度对比和已学单词", Color.FromArgb("#5B8BFF"),
             () => _ = Navigation.PushAsync(new ProgressPage())));
         _root.Children.Add(BigButton("🏆  历史战绩", "看看谁才是背单词之王", Ui.Warn,
             () => _ = Navigation.PushAsync(new HistoryPage())));

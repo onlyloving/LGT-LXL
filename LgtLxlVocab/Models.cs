@@ -73,6 +73,13 @@ public class UserProfile
     }
 }
 
+/// <summary>出题方向：第一次「英语 → 中文」，第二次「中文 → 英语」。</summary>
+public enum QuizMode
+{
+    EnToCn = 0,
+    CnToEn = 1,
+}
+
 /// <summary>一道选择题（背单词与对战共用）。</summary>
 public class Question
 {
@@ -83,6 +90,15 @@ public class Question
     public string ExampleCn { get; set; } = "";
     public List<string> Options { get; set; } = new();
     public int Answer { get; set; }
+
+    /// <summary>这一题的方向；对战默认都是英语找中文。</summary>
+    public QuizMode Mode { get; set; } = QuizMode.EnToCn;
+
+    [JsonIgnore]
+    public bool IsCnToEn => Mode == QuizMode.CnToEn;
+
+    [JsonIgnore]
+    public string StageLabel => IsCnToEn ? "② 中文 → 英语" : "① 英语 → 中文";
 }
 
 /// <summary>联机对战在网络上传输的消息。</summary>

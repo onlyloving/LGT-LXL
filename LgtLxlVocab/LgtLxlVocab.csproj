@@ -16,18 +16,25 @@
 		<!-- 应用信息 -->
 		<ApplicationTitle>LGT-LXL</ApplicationTitle>
 		<ApplicationId>com.lgtlxl.vocab</ApplicationId>
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<ApplicationDisplayVersion>1.5</ApplicationDisplayVersion>
+		<ApplicationVersion>6</ApplicationVersion>
 
 		<!-- Android 7.0 及以上 -->
 		<SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
 		<AndroidPackageFormat>apk</AndroidPackageFormat>
-		<AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-		<!-- 不裁剪也不 AOT：体积换稳定性，反射/JSON 在任何机型上都不会被裁掉 -->
-		<RunAOTCompilation>false</RunAOTCompilation>
-		<!-- 不做程序集裁剪：保证 JSON 序列化等反射功能在任何手机上都不会出问题 -->
-		<AndroidLinkMode>None</AndroidLinkMode>
-		<PublishTrimmed>false</PublishTrimmed>
+
+		<!--
+		  重要：不要再手动把下面几项改成 None / false。
+		  官方模板 Release 的默认组合是：
+		    AndroidLinkMode = SdkOnly
+		    PublishTrimmed = true
+		    RunAOTCompilation = true
+		    AndroidEnableProfiledAot = true
+		  之前全部关掉（None/false/false/false）会出现「启动图之后白屏闪退」——
+		  那是 .NET Android 不支持的组合，Mono 运行时起不来。
+		  下面这条是官方推荐：裁剪后依然允许 System.Text.Json 走反射序列化。
+		-->
+		<JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
 
 		<!-- 仓库内自带签名文件，重新打包的 APK 可以覆盖安装 -->
 		<AndroidKeyStore>true</AndroidKeyStore>

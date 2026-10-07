@@ -4,6 +4,7 @@
 public class BattleSetupPage : ContentPage
 {
     readonly VerticalStackLayout _root = new() { Spacing = 12, Padding = new Thickness(16, 8, 16, 28) };
+    readonly VerticalStackLayout _extra = new() { Spacing = 8 };
     int _count = 50;
     bool _online;
 
@@ -44,6 +45,8 @@ public class BattleSetupPage : ContentPage
             Ui.Lbl(usable < 50 ? "⚠️ 词数不足 50，本局会按实际数量出题；先多背一些单词会更好玩。" : "✅ 词量充足，可以开始对战。",
                 12, usable < 50 ? Ui.Warn : Ui.Good)), Ui.Card, 16, 18));
 
+        _root.Children.Add(_extra);
+
         _root.Children.Add(Ui.SectionTitle("每局词数"));
         var countRow = new Grid { ColumnSpacing = 10 };
         countRow.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
@@ -73,21 +76,42 @@ public class BattleSetupPage : ContentPage
 
     async void Start()
     {
+        _extra.Children.Clear();
         var pool = AppState.LearnedUnion();
         if (pool.Count < 5)
         {
-            await Navigation.PushAsync(new StudyPage());
+            _extra.Children.Add(Ui.Panel(Ui.Stack(8,
+                Ui.Lbl("两个人学会的单词还不够", 16, Ui.Warn, true),
+                Ui.Lbl($"现在两人加起来的已学单词只有 {pool.Count} 个，至少要 5 个才能出题。" +
+                       "（进度保存在手机本地，卸载重装会清空，所以先背几个词吧）", 13, Ui.Dim),
+                Ui.Btn("📖 先去背单词", Ui.Accent, Colors.White, () => _ = Navigation.PushAsync(new StudyPage()), 16),
+                Ui.Btn("🎲 用词库随机词开一局（先试试战功能）", Ui.CardSoft, Ui.Fg, StartWithRandomWords, 15)), Ui.Card));
             return;
         }
-        var want = Math.Min(_count, pool.Count);
+        await LaunchAsync(pool);
+    }
+
+    void StartWithRandomWords()
+    {
+        var pool = AppState.Words
+            .OrderBy(_ => Random.Shared.Next())
+            .Take(300)
+            .Select(w => w.Word)
+            .ToList();
+        _ = LaunchAsync(pool);
+    }
+
+    async Task LaunchAsync(List<string> pool)
+    {
         if (!_online)
         {
+            var want = Math.Min(_count, Math.Max(5, pool.Count));
             var qs = AppState.BuildBattleSet(pool, want, AppState.Words);
-            await Navigation.PushAsync(new BattlePlayPage(qs, "本机", AppState.OtherUser, want, null));
+            await Navigation.PushAsync(new BattlePlayPage(qs, "本机", AppState.OtherUser, qs.Count, null));
         }
         else
         {
-            await Navigation.PushAsync(new LanLobbyPage(want));
+            await Navigation.PushAsync(new LanLobbyPage(_count));
         }
     }
 }
@@ -98,16 +122,18 @@ public class LanLobbyPage : ContentPage
     readonly int _count;
     readonly Label _status = Ui.Lbl("请选择创建房间或加入房间", 14, Ui.Dim);
     readonly Label _ipInfo = Ui.Lbl("", 13, Ui.Dim);
+    readonly VerticalStackLayout _found = new() { Spacing = 8 };
     readonly Entry _ipEntry = new()
     {
-        Placeholder = "输入房主手机上显示的 IP",
+        Placeholder = "也可以手动输入 IP，例如 192.168.1.5",
         PlaceholderColor = Ui.Dim,
         TextColor = Ui.Fg,
         BackgroundColor = Ui.CardSoft,
-        Keyboard = Keyboard.Numeric,
+        Keyboard = Keyboard.Text,
     };
     readonly VerticalStackLayout _root = new() { Spacing = 12, Padding = new Thickness(16, 8, 16, 28) };
     CancellationTokenSource? _cts;
+    CancellationTokenSource? _responder;
     LanBattle? _lan;
     bool _busy;
 
@@ -135,11 +161,35 @@ public class LanLobbyPage : ContentPage
             Ui.Lbl("两台手机连同一个 Wi-Fi（或同一个手机热点），一台点「创建房间」，另一台输入 IP 点「加入房间」。不消耗流量。", 12, Ui.Dim)), Ui.Card));
 
         _root.Children.Add(Ui.Btn("🏠 创建房间（我是房主）", Ui.Accent, Colors.White, Host, 16));
+        _root.Children.Add(Ui.Btn("🔍 自动搜索附近的房主", Color.FromArgb("#3DD6C0"), Colors.White, () => _ = SearchAsync(), 16));
+        _found.Children.Add(Ui.Lbl("点上面的按钮搜索，或让房主把 IP 念给你手动输入。", 12, Ui.Dim));
+        _root.Children.Add(_found);
         _root.Children.Add(Ui.Panel(Ui.Stack(10,
             Ui.Lbl("加入房间", 15, Ui.Fg, true),
             _ipEntry,
             Ui.Btn("🔌 加入", Ui.Accent2, Colors.White, Join, 16)), Ui.Card));
         _root.Children.Add(Ui.Panel(Ui.Stack(6, _status, _ipInfo), Ui.Bg2));
+    }
+
+    async Task SearchAsync()
+    {
+        _found.Children.Clear();
+        _found.Children.Add(Ui.Lbl("正在搜索附近的房主（约 3 秒）…", 13, Ui.Dim));
+        var list = await LanDiscovery.DiscoverAsync(3000);
+        _found.Children.Clear();
+        if (list.Count == 0)
+        {
+            _found.Children.Add(Ui.Lbl(
+                "没有搜到房主。检查一下：① 对方已经点了「创建房间」；② 两台手机连的是同一个 Wi-Fi / 热点；" +
+                "③ 热点没开「设备隔离」。也可以让房主把屏幕上的 IP 念给你，手动输入后点「加入」。", 12, Ui.Warn));
+            return;
+        }
+        foreach (var host in list)
+        {
+            var (row, _) = Ui.TapRow($"📶  {host.Name}    {host.Ip}    点这里加入",
+                () => { _ipEntry.Text = host.Ip; Join(); }, Ui.CardSoft, 14);
+            _found.Children.Add(row);
+        }
     }
 
     void SetStatus(string text, Color? color = null)
@@ -155,18 +205,33 @@ public class LanLobbyPage : ContentPage
         _busy = true;
         _cts = new CancellationTokenSource();
         _lan = new LanBattle();
-        var ip = LanBattle.LocalIp();
-        SetStatus($"等待对方加入…（对方输入 {ip} 后点「加入」）", Ui.Warn);
-        _ipInfo.Text = $"本机 IP：{ip}    端口：{LanBattle.Port}\n若一直连不上：确认两台手机在同一个 Wi-Fi / 热点，且房主手机的「个人热点」没有被设备隔离限制。";
+        SetStatus("正在创建房间…", Ui.Warn);
+        _ipInfo.Text = "正在准备监听端口…";
         try
         {
-            var hello = await _lan.HostAsync(_cts.Token);
+            var hostTask = _lan.HostAsync(_cts.Token, $"{AppState.Me.Name} 的单词房");
+            await Task.Delay(200);
+            var ips = LanBattle.LocalIps();
+            var ipText = ips.Count > 0
+                ? string.Join("  /  ", ips.Select(x => x.Ip + "（" + x.Kind + "）"))
+                : "（没找到局域网地址，请先连上 Wi-Fi 或热点）";
+            _ipInfo.Text = $"本机地址：{ipText}\n端口：{_lan.BoundPort}\n" +
+                           "对方点「自动搜索附近的房主」最省事；连不上时，建议改成一台手机开热点、另一台连热点。";
+            SetStatus("等待对方加入…", Ui.Warn);
+            var hello = await hostTask;
             SetStatus($"✅ {_lan.PeerName} 已加入，正在开始…", Ui.Good);
-            var pool = new HashSet<string>(AppState.Me.Progress.Keys, StringComparer.OrdinalIgnoreCase);
+            var pool = new HashSet<string>(AppState.LearnedUnion(), StringComparer.OrdinalIgnoreCase);
             foreach (var w in hello.Learned ?? new List<string>())
                 if (!string.IsNullOrWhiteSpace(w))
                     pool.Add(w);
-            var qs = AppState.BuildBattleSet(pool.Where(AppState.ByWord.ContainsKey).ToList(), _count, AppState.Words);
+            var usable = pool.Where(AppState.ByWord.ContainsKey).ToList();
+            if (usable.Count < 5)
+            {
+                // 两人都还没背多少词：用词库随机词开局，方便先把联机跑通
+                usable = AppState.Words.OrderBy(_ => Random.Shared.Next()).Take(300).Select(w => w.Word).ToList();
+                SetStatus($"两人已学单词较少，本局改用词库随机词", Ui.Warn);
+            }
+            var qs = AppState.BuildBattleSet(usable, _count, AppState.Words);
             await _lan.SendAsync(new NetMessage
             {
                 T = "start",
@@ -179,14 +244,29 @@ public class LanLobbyPage : ContentPage
         }
         catch (OperationCanceledException)
         {
+            StopResponder();
             SetStatus("已取消", Ui.Dim);
             _busy = false;
         }
         catch (Exception ex)
         {
+            StopResponder();
             SetStatus("创建房间失败：" + ex.Message, Ui.Bad);
             _busy = false;
         }
+    }
+
+    void StopResponder()
+    {
+        try
+        {
+            _responder?.Cancel();
+            _responder?.Dispose();
+        }
+        catch
+        {
+        }
+        _responder = null;
     }
 
     async void Join()
@@ -237,6 +317,7 @@ public class LanLobbyPage : ContentPage
         base.OnDisappearing();
         if (Navigation.NavigationStack.LastOrDefault() == this)
         {
+            StopResponder();
             try
             {
                 _cts?.Cancel();
